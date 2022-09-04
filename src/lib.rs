@@ -1,14 +1,14 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+extern crate core;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use serde_json::{Result, Value};
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+use crate::generators::ClassGenerator;
+
+pub mod generators;
+
+pub fn json_to_class(json_string: &str, mut generator: impl ClassGenerator) -> Result<String> {
+    let v: Value = serde_json::from_str(json_string)?;
+    generator.parse_value(&v);
+
+    Ok(generator.get_result())
 }
