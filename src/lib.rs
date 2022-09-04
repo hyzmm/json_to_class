@@ -10,5 +10,5 @@ pub fn json_to_class(json_string: &str, mut generator: impl ClassGenerator) -> R
     let v: Value = serde_json::from_str(json_string)?;
     generator.parse_value(&v);
 
-    Ok(generator.get_result())
+    Ok(generator.get_full_result())
 }

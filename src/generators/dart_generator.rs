@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
@@ -6,6 +8,7 @@ use crate::generators::ClassGenerator;
 pub struct DartClassGenerator {
     class_name: String,
     fields: Vec<(String, String)>,
+    nested_classes: HashMap<String, String>,
 }
 
 impl DartClassGenerator {
@@ -13,7 +16,57 @@ impl DartClassGenerator {
         DartClassGenerator {
             class_name: class_name.to_string(),
             fields: Vec::new(),
+            nested_classes: HashMap::new(),
         }
+    }
+}
+
+impl DartClassGenerator {
+    fn get_result(self) -> String {
+        let body = self
+            .fields
+            .iter()
+            // always `final` for now
+            .map(|(k, v)| format!("    final {} {};", v, k))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let constructor_args = self
+            .fields
+            .iter()
+            .map(|(k, _)| format!("        required this.{},", k))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let other_classes = self
+            .nested_classes
+            .values()
+            .map(|v| v.as_ref())
+            .collect::<Vec<&str>>()
+            .join("\n\n");
+        let other_classes = if other_classes.is_empty() {
+            other_classes
+        } else {
+            format!("\n\n{}", other_classes)
+        };
+
+        format!(
+            r#"@JsonSerializable()
+class {class_name} {{
+{body}
+    {class_name}({{
+{constructor_args}
+    }});
+
+    factory {class_name}.fromJson(Map<String, dynamic> json) => _${class_name}FromJson(json);
+
+    Map<String, dynamic> toJson() => _${class_name}ToJson(this);
+}}{other_classes}"#,
+            class_name = self.class_name,
+            body = body,
+            constructor_args = constructor_args,
+            other_classes = other_classes,
+        )
     }
 }
 
@@ -57,11 +110,14 @@ impl ClassGenerator for DartClassGenerator {
         format!("List<{}>", result.unwrap())
     }
 
-    fn parse_object(&mut self, obj: &Map<String, Value>) -> &'static str {
+    fn parse_object(&mut self, obj: &Map<String, Value>) -> &str {
         for (k, v) in obj.iter() {
             let type_name = if v.is_object() {
                 let class_name = k.to_case(Case::Pascal);
-                // self.nested_classes.insert(class_name, v);
+                let mut generator = DartClassGenerator::new(class_name.clone().as_ref());
+                generator.parse_value(v);
+                self.nested_classes
+                    .insert(class_name.clone(), generator.get_result());
                 class_name
             } else {
                 self.parse_value(v)
@@ -72,42 +128,16 @@ impl ClassGenerator for DartClassGenerator {
         "dynamic"
     }
 
-    fn get_result(self) -> String {
-        let body = self
-            .fields
-            .iter()
-            // always `final` for now
-            .map(|(k, v)| format!("    final {} {};", v, k))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        let constructor_args = self
-            .fields
-            .iter()
-            .map(|(k, _)| format!("        required this.{},", k))
-            .collect::<Vec<String>>()
-            .join("\n");
-
+    fn get_full_result(self) -> String {
         format!(
             r#"import 'package:json_annotation/json_annotation.dart';
 
 part '{file_name}.g.dart';
 
-@JsonSerializable()
-class {class_name} {{
-{body}
-    {class_name}({{
-{constructor_args}
-    }});
-
-    factory {class_name}.fromJson(Map<String, dynamic> json) => _${class_name}FromJson(json);
-
-    Map<String, dynamic> toJson() => _${class_name}ToJson(this);
-}}"#,
+{class}
+"#,
             file_name = self.class_name.to_case(Case::Snake),
-            class_name = self.class_name,
-            body = body,
-            constructor_args = constructor_args,
+            class = self.get_result(),
         )
     }
 }

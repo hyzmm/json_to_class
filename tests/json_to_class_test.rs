@@ -34,7 +34,8 @@ class Foo {
     factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
 
     Map<String, dynamic> toJson() => _$FooToJson(this);
-}"#
+}
+"#
     );
 }
 
@@ -61,7 +62,8 @@ class Foo {
     factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
 
     Map<String, dynamic> toJson() => _$FooToJson(this);
-}"#
+}
+"#
     );
 }
 
@@ -88,6 +90,84 @@ class Foo {
     factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
 
     Map<String, dynamic> toJson() => _$FooToJson(this);
-}"#
+}
+"#
+    );
+}
+
+#[test]
+fn nested_object_test() {
+    let json_string = r#"{
+        "a": {
+            "b": "c",
+            "d": { "h": 1 }
+        },
+        "e": {
+            "f": null
+        },
+        "g": 2
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    assert_eq!(
+        result,
+        r#"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final A a;
+    final E e;
+    final int g;
+    Foo({
+        required this.a,
+        required this.e,
+        required this.g,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+
+@JsonSerializable()
+class A {
+    final String b;
+    final D d;
+    A({
+        required this.b,
+        required this.d,
+    });
+
+    factory A.fromJson(Map<String, dynamic> json) => _$AFromJson(json);
+
+    Map<String, dynamic> toJson() => _$AToJson(this);
+}
+
+@JsonSerializable()
+class D {
+    final int h;
+    D({
+        required this.h,
+    });
+
+    factory D.fromJson(Map<String, dynamic> json) => _$DFromJson(json);
+
+    Map<String, dynamic> toJson() => _$DToJson(this);
+}
+
+@JsonSerializable()
+class E {
+    final dynamic f;
+    E({
+        required this.f,
+    });
+
+    factory E.fromJson(Map<String, dynamic> json) => _$EFromJson(json);
+
+    Map<String, dynamic> toJson() => _$EToJson(this);
+}
+"#
     );
 }
