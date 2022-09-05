@@ -93,7 +93,7 @@ impl ClassGenerator for DartClassGenerator {
         }
     }
 
-    fn parse_array(&mut self, value: &Vec<Value>) -> String {
+    fn parse_array(&mut self, value: &[Value]) -> String {
         if value.is_empty() {
             return "dynamic".to_string();
         }
