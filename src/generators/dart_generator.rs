@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
@@ -8,7 +6,7 @@ use crate::generators::ClassGenerator;
 pub struct DartClassGenerator {
     class_name: String,
     fields: Vec<(String, String)>,
-    nested_classes: HashMap<String, String>,
+    nested_classes: Vec<String>,
 }
 
 impl DartClassGenerator {
@@ -16,7 +14,7 @@ impl DartClassGenerator {
         DartClassGenerator {
             class_name: class_name.to_string(),
             fields: Vec::new(),
-            nested_classes: HashMap::new(),
+            nested_classes: Vec::new(),
         }
     }
 }
@@ -38,12 +36,7 @@ impl DartClassGenerator {
             .collect::<Vec<String>>()
             .join("\n");
 
-        let other_classes = self
-            .nested_classes
-            .values()
-            .map(|v| v.as_ref())
-            .collect::<Vec<&str>>()
-            .join("\n\n");
+        let other_classes = self.nested_classes.join("\n\n");
         let other_classes = if other_classes.is_empty() {
             other_classes
         } else {
@@ -116,8 +109,7 @@ impl ClassGenerator for DartClassGenerator {
                 let class_name = k.to_case(Case::Pascal);
                 let mut generator = DartClassGenerator::new(class_name.clone().as_ref());
                 generator.parse_value(v);
-                self.nested_classes
-                    .insert(class_name.clone(), generator.get_result());
+                self.nested_classes.push(generator.get_result());
                 class_name
             } else {
                 self.parse_value(v)
