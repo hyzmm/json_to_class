@@ -6,5 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "3.2.20", features = ["derive"] }
 convert_case = "0.5.0"
 serde_json = "1.0"
+
+[lib]
+name = "json_to_class"
+path = "src/lib.rs"
+
+[[bin]]
+name = "json_2_class"
+path = "src/bin/main.rs"
