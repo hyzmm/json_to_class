@@ -172,3 +172,30 @@ class E {
 "#
     );
 }
+
+#[test]
+fn illegal_json_key() {
+    let json_string = r#"{
+        "$a-b?": "c"
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    assert_eq!(
+        result,
+        r"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final String ab;
+    Foo({
+        required this.ab,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+");
+}
