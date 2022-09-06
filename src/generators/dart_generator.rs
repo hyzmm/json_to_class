@@ -105,7 +105,12 @@ impl ClassGenerator for DartClassGenerator {
 
     fn parse_object(&mut self, obj: &Map<String, Value>) -> &str {
         for (k, v) in obj.iter() {
-            let k = k.chars().filter(|c| c.is_alphanumeric()).collect::<String>();
+            // remote illegal characters and leading numbers
+            let k = k
+                .trim_start_matches(|c: char| c.is_numeric())
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string();
+
             let type_name = if v.is_object() {
                 let class_name = k.to_case(Case::Pascal);
                 let mut generator = DartClassGenerator::new(class_name.clone().as_ref());

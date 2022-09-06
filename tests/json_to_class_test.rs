@@ -199,3 +199,63 @@ class Foo {
 }
 ");
 }
+
+
+#[test]
+fn json_key_with_numerical_prefix() {
+    let json_string = r#"{
+        "123ab": "c",
+        "a1b": "d"
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    assert_eq!(
+        result,
+        r"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final String ab;
+    final String a1B;
+    Foo({
+        required this.ab,
+        required this.a1B,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+");
+}
+
+
+#[test]
+fn duplicated_json_keys_test() {
+    let json_string = r#"{
+        "a": "c",
+        "a": "d"
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    assert_eq!(
+        result,
+        r"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final String a;
+    Foo({
+        required this.a,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+");
+}
