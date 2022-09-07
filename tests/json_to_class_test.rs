@@ -258,3 +258,138 @@ class Foo {
 }
 ");
 }
+
+
+#[test]
+fn duplicated_class_test() {
+    let json_string = r#"{
+        "a": { "b": "c" },
+        "d": { "a": { "b": "c" } }
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    println!("{}", result);
+    assert_eq!(
+        result,
+        r"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final A a;
+    final D d;
+    Foo({
+        required this.a,
+        required this.d,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+
+@JsonSerializable()
+class A {
+    final String b;
+    A({
+        required this.b,
+    });
+
+    factory A.fromJson(Map<String, dynamic> json) => _$AFromJson(json);
+
+    Map<String, dynamic> toJson() => _$AToJson(this);
+}
+
+@JsonSerializable()
+class D {
+    final A a;
+    D({
+        required this.a,
+    });
+
+    factory D.fromJson(Map<String, dynamic> json) => _$DFromJson(json);
+
+    Map<String, dynamic> toJson() => _$DToJson(this);
+}
+");
+}
+
+
+#[test]
+fn same_class_name_with_different_content() {
+    let json_string = r#"{
+        "a": { "b": "c" },
+        "d": { "a": { "e": "c" } }
+    }"#;
+    let generator = DartClassGenerator::new("Foo");
+    let result = json_to_class(json_string, generator).unwrap();
+    assert_eq!(
+        result,
+        r"import 'package:json_annotation/json_annotation.dart';
+
+part 'foo.g.dart';
+
+@JsonSerializable()
+class Foo {
+    final A a;
+    final D d;
+    Foo({
+        required this.a,
+        required this.d,
+    });
+
+    factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
+
+    Map<String, dynamic> toJson() => _$FooToJson(this);
+}
+
+@JsonSerializable()
+class A {
+    final String b;
+    A({
+        required this.b,
+    });
+
+    factory A.fromJson(Map<String, dynamic> json) => _$AFromJson(json);
+
+    Map<String, dynamic> toJson() => _$AToJson(this);
+}
+
+@JsonSerializable()
+class D {
+    final A a;
+    D({
+        required this.a,
+    });
+
+    factory D.fromJson(Map<String, dynamic> json) => _$DFromJson(json);
+
+    Map<String, dynamic> toJson() => _$DToJson(this);
+}
+
+@JsonSerializable()
+class A1 {
+    final String e;
+    A1({
+        required this.e,
+    });
+
+    factory A1.fromJson(Map<String, dynamic> json) => _$A1FromJson(json);
+
+    Map<String, dynamic> toJson() => _$A1ToJson(this);
+}
+
+@JsonSerializable()
+class A2 {
+    final String e;
+    A2({
+        required this.e,
+    });
+
+    factory A2.fromJson(Map<String, dynamic> json) => _$A2FromJson(json);
+
+    Map<String, dynamic> toJson() => _$A2ToJson(this);
+}
+");
+}

@@ -1,12 +1,30 @@
+use std::collections::HashMap;
+
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
 use crate::generators::ClassGenerator;
 
+#[derive(PartialEq, Eq, Clone)]
+pub enum FieldType {
+    BaseType(String),
+    Class(DartClassGenerator),
+}
+
+impl FieldType {
+    fn get_type(&self) -> String {
+        match self {
+            FieldType::BaseType(value) => value.clone(),
+            FieldType::Class(class) => class.class_name.clone(),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
 pub struct DartClassGenerator {
     class_name: String,
-    fields: Vec<(String, String)>,
-    nested_classes: Vec<String>,
+    fields: Vec<(String, FieldType)>,
+    classes: Vec<DartClassGenerator>,
 }
 
 impl DartClassGenerator {
@@ -14,18 +32,29 @@ impl DartClassGenerator {
         DartClassGenerator {
             class_name: class_name.to_string(),
             fields: Vec::new(),
-            nested_classes: Vec::new(),
+            classes: Vec::new(),
         }
     }
 }
 
 impl DartClassGenerator {
-    fn get_result(self) -> Vec<String> {
+    fn get_classes_recursively(&self) -> Vec<DartClassGenerator> {
+        let mut result = Vec::new();
+        result.push(self.clone());
+        for class in &self.classes {
+            result.push(class.clone());
+            result.append(&mut class.get_classes_recursively());
+        }
+        result
+    }
+
+    fn get_result(&self, override_class_name: Option<String>) -> String {
+        let class_name = override_class_name.unwrap_or_else(|| self.class_name.clone());
         let body = self
             .fields
             .iter()
             // always `final` for now
-            .map(|(k, v)| format!("    final {} {};", v, k))
+            .map(|(k, v)| format!("    final {} {};", v.get_type(), k))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -36,7 +65,7 @@ impl DartClassGenerator {
             .collect::<Vec<String>>()
             .join("\n");
 
-        let class = format!(
+        format!(
             r#"@JsonSerializable()
 class {class_name} {{
 {body}
@@ -48,14 +77,10 @@ class {class_name} {{
 
     Map<String, dynamic> toJson() => _${class_name}ToJson(this);
 }}"#,
-            class_name = self.class_name,
+            class_name = class_name,
             body = body,
             constructor_args = constructor_args,
-        );
-        let mut result = Vec::new();
-        result.push(class);
-        result.extend(self.nested_classes);
-        result
+        )
     }
 }
 
@@ -106,31 +131,57 @@ impl ClassGenerator for DartClassGenerator {
                 .trim_start_matches(|c: char| c.is_numeric())
                 .replace(|c: char| !c.is_alphanumeric(), "")
                 .to_string();
-            let type_name = if v.is_object() {
+            if v.is_object() {
                 let class_name = k.to_case(Case::Pascal);
                 let mut generator = DartClassGenerator::new(class_name.clone().as_ref());
                 generator.parse_value(v);
-                self.nested_classes.extend(generator.get_result());
-                class_name
+                self.classes.push(generator.clone());
+                self.fields.push((k.to_case(Case::Camel), FieldType::Class(generator.clone())));
             } else {
-                self.parse_value(v)
+                let t = self.parse_value(v);
+                self.fields.push((k.to_case(Case::Camel), FieldType::BaseType(t)));
             };
-            self.fields
-                .push((k.to_string().to_case(Case::Camel), type_name.to_string()));
         }
         "dynamic"
     }
 
     fn get_full_result(self) -> String {
+        let mut classes_string: Vec<String> = Vec::new();
+        let mut generated_classes: HashMap<String, (DartClassGenerator, usize)> = HashMap::new();
+
+        let mut classes = self.get_classes_recursively();
+        classes.push(self.clone());
+
+        for class in classes {
+            let name = class.class_name.clone();
+
+            if generated_classes.contains_key(&name)
+                && generated_classes[&name].0 == class {
+                continue;
+            }
+
+            // insert if not exists, or increment if exists
+            generated_classes.entry(name.clone())
+                .and_modify(|e| e.1 += 1)
+                .or_insert((class.clone(), 0));
+
+            let name = if generated_classes[&name.clone()].1 > 0 {
+                Some(format!("{}{}", name, generated_classes[&name.clone()].1))
+            } else {
+                None
+            };
+            classes_string.push(class.get_result(name));
+        }
+
         format!(
             r#"import 'package:json_annotation/json_annotation.dart';
 
 part '{file_name}.g.dart';
 
-{class}
+{classes_string}
 "#,
             file_name = self.class_name.to_case(Case::Snake),
-            class = self.get_result().join("\n\n"),
+            classes_string = classes_string.join("\n\n"),
         )
     }
 }
