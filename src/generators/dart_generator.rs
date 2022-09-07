@@ -20,7 +20,7 @@ impl DartClassGenerator {
 }
 
 impl DartClassGenerator {
-    fn get_result(self) -> String {
+    fn get_result(self) -> Vec<String> {
         let body = self
             .fields
             .iter()
@@ -36,14 +36,7 @@ impl DartClassGenerator {
             .collect::<Vec<String>>()
             .join("\n");
 
-        let other_classes = self.nested_classes.join("\n\n");
-        let other_classes = if other_classes.is_empty() {
-            other_classes
-        } else {
-            format!("\n\n{}", other_classes)
-        };
-
-        format!(
+        let class = format!(
             r#"@JsonSerializable()
 class {class_name} {{
 {body}
@@ -54,12 +47,15 @@ class {class_name} {{
     factory {class_name}.fromJson(Map<String, dynamic> json) => _${class_name}FromJson(json);
 
     Map<String, dynamic> toJson() => _${class_name}ToJson(this);
-}}{other_classes}"#,
+}}"#,
             class_name = self.class_name,
             body = body,
             constructor_args = constructor_args,
-            other_classes = other_classes,
-        )
+        );
+        let mut result = Vec::new();
+        result.push(class);
+        result.extend(self.nested_classes);
+        result
     }
 }
 
@@ -105,17 +101,16 @@ impl ClassGenerator for DartClassGenerator {
 
     fn parse_object(&mut self, obj: &Map<String, Value>) -> &str {
         for (k, v) in obj.iter() {
-            // remote illegal characters and leading numbers
+            // remove illegal characters and leading numbers
             let k = k
                 .trim_start_matches(|c: char| c.is_numeric())
-                .trim_matches(|c: char| !c.is_alphanumeric())
+                .replace(|c: char| !c.is_alphanumeric(), "")
                 .to_string();
-
             let type_name = if v.is_object() {
                 let class_name = k.to_case(Case::Pascal);
                 let mut generator = DartClassGenerator::new(class_name.clone().as_ref());
                 generator.parse_value(v);
-                self.nested_classes.push(generator.get_result());
+                self.nested_classes.extend(generator.get_result());
                 class_name
             } else {
                 self.parse_value(v)
@@ -135,7 +130,7 @@ part '{file_name}.g.dart';
 {class}
 "#,
             file_name = self.class_name.to_case(Case::Snake),
-            class = self.get_result(),
+            class = self.get_result().join("\n\n"),
         )
     }
 }

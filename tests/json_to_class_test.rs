@@ -109,7 +109,6 @@ fn nested_object_test() {
     }"#;
     let generator = DartClassGenerator::new("Foo");
     let result = json_to_class(json_string, generator).unwrap();
-    println!("{}", result);
     assert_eq!(
         result,
         r#"import 'package:json_annotation/json_annotation.dart';

@@ -1,12 +1,9 @@
-use json_to_class::json_to_class;
+use clap::Parser;
 use json_to_class::generators::dart_generator::DartClassGenerator;
-
+use json_to_class::json_to_class;
 use std::fs;
-use std::fs::File;
 use std::path::PathBuf;
 use std::process::exit;
-
-use clap::Parser;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
