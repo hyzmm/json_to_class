@@ -1,5 +1,32 @@
+use convert_case::Case;
+
+use json_to_class::generators::to_legal_case;
 use json_to_class::generators::dart_generator::DartClassGenerator;
 use json_to_class::json_to_class;
+
+#[test]
+fn remove_illegal_characters_test() {
+    assert_eq!(to_legal_case("a", Case::Pascal), "A");
+    assert_eq!(to_legal_case("a", Case::Camel), "a");
+    assert_eq!(to_legal_case("1a", Case::Pascal), "A");
+    assert_eq!(to_legal_case("1a", Case::Camel), "a");
+    assert_eq!(to_legal_case("1-a", Case::Pascal), "A");
+    assert_eq!(to_legal_case("1-a", Case::Camel), "a");
+    assert_eq!(to_legal_case("1a-a", Case::Pascal), "AA");
+    assert_eq!(to_legal_case("1a-a", Case::Camel), "aA");
+    assert_eq!(to_legal_case("1a-b", Case::Pascal), "AB");
+    assert_eq!(to_legal_case("1a-b", Case::Camel), "aB");
+    assert_eq!(to_legal_case("1a-b2", Case::Pascal), "AB2");
+    assert_eq!(to_legal_case("1a-b2", Case::Camel), "aB2");
+    assert_eq!(to_legal_case("1a-b2$", Case::Pascal), "AB2");
+    assert_eq!(to_legal_case("1a-b2$", Case::Camel), "aB2");
+    assert_eq!(to_legal_case("$meta", Case::Pascal), "Meta");
+    assert_eq!(to_legal_case("$meta", Case::Camel), "meta");
+    assert_eq!(to_legal_case("$meta-data", Case::Pascal), "MetaData");
+    assert_eq!(to_legal_case("$meta-data", Case::Camel), "metaData");
+    assert_eq!(to_legal_case("$a-b?", Case::Pascal), "AB");
+    assert_eq!(to_legal_case("$a-b?", Case::Camel), "aB");
+}
 
 #[test]
 fn simple_type_test() {
@@ -181,22 +208,23 @@ fn illegal_json_key() {
     let result = json_to_class(json_string, generator).unwrap();
     assert_eq!(
         result,
-        r"import 'package:json_annotation/json_annotation.dart';
+        r#"import 'package:json_annotation/json_annotation.dart';
 
 part 'foo.g.dart';
 
 @JsonSerializable()
 class Foo {
-    final String ab;
+    @JsonKey(name: "\$a-b?")
+    final String aB;
     Foo({
-        required this.ab,
+        required this.aB,
     });
 
     factory Foo.fromJson(Map<String, dynamic> json) => _$FooFromJson(json);
 
     Map<String, dynamic> toJson() => _$FooToJson(this);
 }
-");
+"#);
 }
 
 
@@ -210,12 +238,13 @@ fn json_key_with_numerical_prefix() {
     let result = json_to_class(json_string, generator).unwrap();
     assert_eq!(
         result,
-        r"import 'package:json_annotation/json_annotation.dart';
+        r#"import 'package:json_annotation/json_annotation.dart';
 
 part 'foo.g.dart';
 
 @JsonSerializable()
 class Foo {
+    @JsonKey(name: "123ab")
     final String ab;
     final String a1B;
     Foo({
@@ -227,7 +256,7 @@ class Foo {
 
     Map<String, dynamic> toJson() => _$FooToJson(this);
 }
-");
+"#);
 }
 
 

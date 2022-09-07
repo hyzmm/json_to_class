@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
-use crate::generators::ClassGenerator;
+use crate::generators::{ClassGenerator, to_legal_case};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum FieldType {
@@ -54,14 +54,23 @@ impl DartClassGenerator {
             .fields
             .iter()
             // always `final` for now
-            .map(|(k, v)| format!("    final {} {};", v.get_type(), k))
+            .map(|(k, v)| {
+                let var = to_legal_case(k, Case::Camel);
+                let var_declaration = format!("    final {} {};", v.get_type(), var);
+                if var == k.to_case(Case::Camel) {
+                    var_declaration
+                } else {
+                    format!("    @JsonKey(name: \"{}\")\n\
+                        {}", k.replace('$', "\\$"), var_declaration)
+                }
+            })
             .collect::<Vec<String>>()
             .join("\n");
 
         let constructor_args = self
             .fields
             .iter()
-            .map(|(k, _)| format!("        required this.{},", k))
+            .map(|(k, _)| format!("        required this.{},", to_legal_case(k, Case::Camel)))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -126,20 +135,16 @@ impl ClassGenerator for DartClassGenerator {
 
     fn parse_object(&mut self, obj: &Map<String, Value>) -> &str {
         for (k, v) in obj.iter() {
-            // remove illegal characters and leading numbers
-            let k = k
-                .trim_start_matches(|c: char| c.is_numeric())
-                .replace(|c: char| !c.is_alphanumeric(), "")
-                .to_string();
             if v.is_object() {
-                let class_name = k.to_case(Case::Pascal);
-                let mut generator = DartClassGenerator::new(class_name.clone().as_ref());
+                let mut generator = DartClassGenerator::new(
+                    to_legal_case(k, Case::Pascal).clone().as_ref(),
+                );
                 generator.parse_value(v);
                 self.classes.push(generator.clone());
-                self.fields.push((k.to_case(Case::Camel), FieldType::Class(generator.clone())));
+                self.fields.push((k.clone(), FieldType::Class(generator.clone())));
             } else {
                 let t = self.parse_value(v);
-                self.fields.push((k.to_case(Case::Camel), FieldType::BaseType(t)));
+                self.fields.push((k.clone(), FieldType::BaseType(t)));
             };
         }
         "dynamic"
