@@ -16,3 +16,22 @@ pub fn to_legal_case(name: &str, case: Case) -> String {
         .to_case(case)
         .replace(|c: char| !c.is_alphanumeric(), "")
 }
+
+#[derive(clap::ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum NamingRule {
+    None,
+    Snake,
+    Pascal,
+    Kebab,
+}
+
+impl Into<Case> for NamingRule {
+    fn into(self) -> Case {
+        match self {
+            NamingRule::None => Case::Snake,
+            NamingRule::Snake => Case::Snake,
+            NamingRule::Pascal => Case::Pascal,
+            NamingRule::Kebab => Case::Kebab,
+        }
+    }
+}

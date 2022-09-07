@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
-use crate::generators::{ClassGenerator, to_legal_case};
+use crate::generators::{ClassGenerator, NamingRule, to_legal_case};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum FieldType {
@@ -25,14 +25,19 @@ pub struct DartClassGenerator {
     class_name: String,
     fields: Vec<(String, FieldType)>,
     classes: Vec<DartClassGenerator>,
+    naming_rule: NamingRule,
 }
 
 impl DartClassGenerator {
-    pub fn new(class_name: &str) -> DartClassGenerator {
+    pub fn new(
+        class_name: &str,
+        naming_rule: NamingRule,
+    ) -> DartClassGenerator {
         DartClassGenerator {
             class_name: class_name.to_string(),
             fields: Vec::new(),
             classes: Vec::new(),
+            naming_rule,
         }
     }
 }
@@ -49,6 +54,15 @@ impl DartClassGenerator {
     }
 
     fn get_result(&self, override_class_name: Option<String>) -> String {
+        let renaming_rule = match self.naming_rule {
+            NamingRule::None => None,
+            NamingRule::Snake => Some("snake"),
+            NamingRule::Pascal => Some("pascal"),
+            NamingRule::Kebab => Some("kebab"),
+        };
+        let renaming_rule: String = if let Some(rule) = renaming_rule {
+            format!("fieldRename: FieldRename.{}", rule)
+        } else { String::default() };
         let class_name = override_class_name.unwrap_or_else(|| self.class_name.clone());
         let body = self
             .fields
@@ -56,8 +70,9 @@ impl DartClassGenerator {
             // always `final` for now
             .map(|(k, v)| {
                 let var = to_legal_case(k, Case::Camel);
+                // determine if the key should be renamed
                 let var_declaration = format!("    final {} {};", v.get_type(), var);
-                if var == k.to_case(Case::Camel) {
+                if var == k.to_case(self.naming_rule.into()) {
                     var_declaration
                 } else {
                     format!("    @JsonKey(name: \"{}\")\n\
@@ -75,7 +90,7 @@ impl DartClassGenerator {
             .join("\n");
 
         format!(
-            r#"@JsonSerializable()
+            r#"@JsonSerializable({renaming_rule})
 class {class_name} {{
 {body}
     {class_name}({{
@@ -86,6 +101,7 @@ class {class_name} {{
 
     Map<String, dynamic> toJson() => _${class_name}ToJson(this);
 }}"#,
+            renaming_rule = renaming_rule,
             class_name = class_name,
             body = body,
             constructor_args = constructor_args,
@@ -138,6 +154,7 @@ impl ClassGenerator for DartClassGenerator {
             if v.is_object() {
                 let mut generator = DartClassGenerator::new(
                     to_legal_case(k, Case::Pascal).clone().as_ref(),
+                    self.naming_rule,
                 );
                 generator.parse_value(v);
                 self.classes.push(generator.clone());
