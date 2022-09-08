@@ -28,6 +28,7 @@ pub struct DartClassGenerator {
     naming_rule: NamingRule,
 }
 
+
 impl DartClassGenerator {
     pub fn new(
         class_name: &str,
@@ -39,6 +40,10 @@ impl DartClassGenerator {
             classes: Vec::new(),
             naming_rule,
         }
+    }
+
+    pub(crate) fn change_class_name(&mut self, new_name: String) {
+        self.class_name = new_name;
     }
 }
 
@@ -52,7 +57,7 @@ impl DartClassGenerator {
         result
     }
 
-    fn get_result(&self, override_class_name: Option<String>) -> String {
+    fn get_result(&self) -> String {
         let renaming_rule = match self.naming_rule {
             NamingRule::None => None,
             NamingRule::Snake => Some("snake"),
@@ -62,7 +67,6 @@ impl DartClassGenerator {
         let renaming_rule: String = if let Some(rule) = renaming_rule {
             format!("fieldRename: FieldRename.{}", rule)
         } else { String::default() };
-        let class_name = override_class_name.unwrap_or_else(|| self.class_name.clone());
         let body = self
             .fields
             .iter()
@@ -101,7 +105,7 @@ class {class_name} {{
     Map<String, dynamic> toJson() => _${class_name}ToJson(this);
 }}"#,
             renaming_rule = renaming_rule,
-            class_name = class_name,
+            class_name = self.class_name,
             body = body,
             constructor_args = constructor_args,
         )
@@ -172,7 +176,7 @@ impl ClassGenerator for DartClassGenerator {
 
         let classes = self.get_classes_recursively();
 
-        for class in classes {
+        for mut class in classes {
             let name = class.class_name.clone();
 
             if generated_classes.contains_key(&name)
@@ -191,7 +195,10 @@ impl ClassGenerator for DartClassGenerator {
             } else {
                 None
             };
-            classes_string.push(class.get_result(name));
+            if name.is_some() {
+                class.change_class_name(name.unwrap().clone());
+            }
+            classes_string.push(class.get_result());
         }
 
         format!(
