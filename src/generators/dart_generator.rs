@@ -1,30 +1,32 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use convert_case::{Case, Casing};
 use serde_json::{Map, Value};
 
 use crate::generators::{ClassGenerator, NamingRule, to_legal_case};
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq)]
 pub enum FieldType {
     BaseType(String),
-    Class(DartClassGenerator),
+    Class(Rc<RefCell<DartClassGenerator>>),
 }
 
 impl FieldType {
     fn get_type(&self) -> String {
         match self {
             FieldType::BaseType(value) => value.clone(),
-            FieldType::Class(class) => class.class_name.clone(),
+            FieldType::Class(class) => class.borrow().class_name.clone(),
         }
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq)]
 pub struct DartClassGenerator {
     class_name: String,
     fields: Vec<(String, FieldType)>,
-    classes: Vec<DartClassGenerator>,
+    classes: Vec<Rc<RefCell<DartClassGenerator>>>,
     naming_rule: NamingRule,
 }
 
@@ -48,11 +50,11 @@ impl DartClassGenerator {
 }
 
 impl DartClassGenerator {
-    fn get_classes_recursively(&self) -> Vec<DartClassGenerator> {
-        let mut result = Vec::new();
-        result.push(self.clone());
+    fn get_classes_recursively(&self) -> Vec<Rc<RefCell<DartClassGenerator>>> {
+        let mut result: Vec<Rc<RefCell<DartClassGenerator>>> = Vec::new();
         for class in &self.classes {
-            result.append(&mut class.get_classes_recursively());
+            result.push(class.clone());
+            result.append(&mut class.borrow().get_classes_recursively());
         }
         result
     }
@@ -160,6 +162,7 @@ impl ClassGenerator for DartClassGenerator {
                     self.naming_rule,
                 );
                 generator.parse_value(v);
+                let generator = Rc::new(RefCell::new(generator));
                 self.classes.push(generator.clone());
                 self.fields.push((k.clone(), FieldType::Class(generator.clone())));
             } else {
@@ -171,17 +174,17 @@ impl ClassGenerator for DartClassGenerator {
     }
 
     fn get_full_result(self) -> String {
-        let mut classes_string: Vec<String> = Vec::new();
-        let mut generated_classes: HashMap<String, (DartClassGenerator, usize)> = HashMap::new();
+        let mut generated_classes: HashMap<String, (Rc<RefCell<DartClassGenerator>>, usize)> = HashMap::new();
 
-        let classes = self.get_classes_recursively();
-
-        for mut class in classes {
-            let name = class.class_name.clone();
+        let file_name = self.class_name.to_case(Case::Snake);
+        let mut classes = self.get_classes_recursively();
+        classes.insert(0, Rc::new(RefCell::new(self)));
+        classes.retain(|class| {
+            let name = class.borrow().class_name.clone();
 
             if generated_classes.contains_key(&name)
-                && generated_classes[&name].0 == class {
-                continue;
+                && generated_classes[&name].0 == *class {
+                return false;
             }
 
             // insert if not exists, or increment if exists
@@ -189,17 +192,25 @@ impl ClassGenerator for DartClassGenerator {
                 .and_modify(|e| e.1 += 1)
                 .or_insert((class.clone(), 0))
                 .1;
-
             let name = if count > 0 {
                 Some(format!("{}{}", name, count))
             } else {
                 None
             };
-            if name.is_some() {
-                class.change_class_name(name.unwrap().clone());
+            if let Some(n) = name {
+                class.borrow_mut().change_class_name(n);
             }
-            classes_string.push(class.get_result());
-        }
+
+            true
+        });
+
+        // `get_result` should be called after `change_class_name`
+        // so that the class field type is correct
+        let classes_string = classes
+            .iter()
+            .map(|c| c.borrow().get_result())
+            .collect::<Vec<String>>()
+            .join("\n\n");
 
         format!(
             r#"import 'package:json_annotation/json_annotation.dart';
@@ -208,8 +219,8 @@ part '{file_name}.g.dart';
 
 {classes_string}
 "#,
-            file_name = self.class_name.to_case(Case::Snake),
-            classes_string = classes_string.join("\n\n"),
+            file_name = file_name,
+            classes_string = classes_string,
         )
     }
 }
