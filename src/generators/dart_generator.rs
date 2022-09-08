@@ -181,12 +181,13 @@ impl ClassGenerator for DartClassGenerator {
             }
 
             // insert if not exists, or increment if exists
-            generated_classes.entry(name.clone())
+            let count = generated_classes.entry(name.clone())
                 .and_modify(|e| e.1 += 1)
-                .or_insert((class.clone(), 0));
+                .or_insert((class.clone(), 0))
+                .1;
 
-            let name = if generated_classes[&name.clone()].1 > 0 {
-                Some(format!("{}{}", name, generated_classes[&name.clone()].1))
+            let name = if count > 0 {
+                Some(format!("{}{}", name, count))
             } else {
                 None
             };
