@@ -1,7 +1,7 @@
 use convert_case::Case;
 
 use json_to_class::generators::{NamingRule, to_legal_case};
-use json_to_class::generators::dart_generator::{DartClassGenerator, FieldType};
+use json_to_class::generators::dart_generator::{DartClassGenerator};
 use json_to_class::json_to_class;
 
 #[test]
@@ -246,6 +246,7 @@ part 'foo.g.dart';
 class Foo {
     @JsonKey(name: "123ab")
     final String ab;
+    @JsonKey(name: "a1b")
     final String a1B;
     Foo({
         required this.ab,
@@ -407,18 +408,6 @@ class A1 {
     factory A1.fromJson(Map<String, dynamic> json) => _$A1FromJson(json);
 
     Map<String, dynamic> toJson() => _$A1ToJson(this);
-}
-
-@JsonSerializable()
-class A2 {
-    final String e;
-    A2({
-        required this.e,
-    });
-
-    factory A2.fromJson(Map<String, dynamic> json) => _$A2FromJson(json);
-
-    Map<String, dynamic> toJson() => _$A2ToJson(this);
 }
 ");
 }
