@@ -1,7 +1,7 @@
 use convert_case::Case;
 
 use json_to_class::generators::{NamingRule, to_legal_case};
-use json_to_class::generators::dart_generator::DartClassGenerator;
+use json_to_class::generators::dart_generator::{DartClassGenerator, FieldType};
 use json_to_class::json_to_class;
 
 #[test]

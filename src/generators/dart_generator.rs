@@ -47,7 +47,6 @@ impl DartClassGenerator {
         let mut result = Vec::new();
         result.push(self.clone());
         for class in &self.classes {
-            result.push(class.clone());
             result.append(&mut class.get_classes_recursively());
         }
         result
@@ -171,8 +170,7 @@ impl ClassGenerator for DartClassGenerator {
         let mut classes_string: Vec<String> = Vec::new();
         let mut generated_classes: HashMap<String, (DartClassGenerator, usize)> = HashMap::new();
 
-        let mut classes = self.get_classes_recursively();
-        classes.push(self.clone());
+        let classes = self.get_classes_recursively();
 
         for class in classes {
             let name = class.class_name.clone();
